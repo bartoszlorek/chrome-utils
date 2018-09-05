@@ -41,7 +41,7 @@ describe('.on()', () => {
         const handler = jest.fn()
         message.on('sign', handler)
         expect(handler).toHaveBeenCalledTimes(1)
-        expect(handler).toHaveBeenCalledWith(request, sender, response)
+        expect(handler).toHaveBeenLastCalledWith(request, sender, response)
     })
 
     it('should not call callback function for other types', () => {
@@ -76,6 +76,63 @@ describe('.toBack()', () => {
 
         message.toBack(request, callback)
         expect(sendMessage).toHaveBeenCalledTimes(1)
-        expect(sendMessage).toHaveBeenCalledWith(request, callback)
+        expect(sendMessage).toHaveBeenLastCalledWith(request, callback)
+    })
+})
+
+describe('.toTab()', () => {
+    beforeEach(() => {
+        global.chrome = {
+            tabs: {
+                sendMessage: jest.fn()
+            }
+        }
+    })
+
+    it('should throw error for incorrect type', () => {
+        expect(() => message.toTab()).toThrow(ERROR_ID)
+    })
+
+    it('should send message to tab', () => {
+        const { sendMessage } = global.chrome.tabs
+        const id = 10
+        const request = { type: 'SIGN', data: 'user' }
+        const callback = jest.fn()
+
+        message.toTab(id, request, callback)
+        expect(sendMessage).toHaveBeenCalledTimes(1)
+        expect(sendMessage).toHaveBeenLastCalledWith(id, request, callback)
+    })
+
+    it('should send message to all tab', () => {
+        global.chrome.tabs.query = jest.fn((info, fn) => fn([
+            { id: 0 },
+            { id: 1 },
+            { id: 2 }
+        ]))
+        const { sendMessage } = global.chrome.tabs
+        const request = { type: 'SIGN', data: 'user' }
+        const callback = jest.fn()
+
+        message.toTab.all(request, callback)
+        expect(sendMessage).toHaveBeenCalledTimes(3)
+        expect(sendMessage.mock.calls).toEqual([
+            [0, request, callback],
+            [1, request, callback],
+            [2, request, callback]
+        ])
+    })
+
+    it('should send message to current tab', async () => {
+        global.chrome.tabs.query = jest.fn((info, fn) => fn([{ id: 4 }]))
+        const { sendMessage } = global.chrome.tabs
+        const request = { type: 'SIGN', data: 'user' }
+        const callback = jest.fn()
+
+        await message.toTab.current(request, callback)
+        expect(sendMessage).toHaveBeenCalledTimes(1)
+        expect(sendMessage.mock.calls).toEqual([
+            [4, request, callback]
+        ])
     })
 })
